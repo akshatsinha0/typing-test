@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { generatePracticeText } from '../../../services/openai';
+import { generatePracticeText } from '../../../services/huggingface';
 
 export const useTextGenerator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
