@@ -419,9 +419,11 @@ const App: React.FC = () => {
                   {isGenerating || isApiGenerating ? 'Preparing Challenge...' : 'Start Typing Test'}
                 </Button>
                 {error && (
-                  <Typography variant="body2" color="var(--error)" style={{ marginTop: '0.5rem' }}>
-                    {error}
-                  </Typography>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <Typography variant="body2" color="var(--error)">
+                      {error}
+                    </Typography>
+                  </div>
                 )}
               </div>
             </SettingsPanel>
@@ -446,7 +448,7 @@ const App: React.FC = () => {
                     {testResult.wpm}
                   </Typography>
                   <Typography variant="caption" color="var(--text-secondary)">
-                    Raw: {testResult.rawWpm?.toFixed(1) || testResult.wpm}
+                    Raw: {testResult.rawWPM?.toFixed(1) || testResult.wpm}
                   </Typography>
                 </ResultItem>
 
