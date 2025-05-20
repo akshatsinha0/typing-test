@@ -28,24 +28,32 @@ const variantMapping: Record<TypographyVariant, keyof JSX.IntrinsicElements> = {
   code: 'code',
 };
 
-const StyledTypography = styled.div<Omit<TypographyProps, 'children'>>`
+interface StyledTypographyProps {
+  $variant?: TypographyVariant;
+  $color?: string;
+  $align?: TypographyAlign;
+  $gutterBottom?: boolean;
+  $noWrap?: boolean;
+}
+
+const StyledTypography = styled.div<StyledTypographyProps>`
   margin: 0;
   padding: 0;
-  color: ${props => props.color || 'var(--text-primary)'};
-  text-align: ${props => props.align || 'left'};
+  color: ${props => props.$color || 'var(--text-primary)'};
+  text-align: ${props => props.$align || 'left'};
   
-  ${props => props.gutterBottom && css`
+  ${props => props.$gutterBottom && css`
     margin-bottom: 0.75em;
   `}
   
-  ${props => props.noWrap && css`
+  ${props => props.$noWrap && css`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   `}
   
   ${props => {
-    switch (props.variant) {
+    switch (props.$variant) {
       case 'h1':
         return css`
           font-size: 2.5rem;
@@ -95,7 +103,7 @@ const StyledTypography = styled.div<Omit<TypographyProps, 'children'>>`
           font-size: 0.75rem;
           font-weight: 400;
           line-height: 1.5;
-          color: ${props.color || 'var(--text-secondary)'};
+          color: ${props.$color || 'var(--text-secondary)'};
         `;
       case 'code':
         return css`
@@ -130,11 +138,11 @@ export const Typography: React.FC<TypographyProps> = ({
   return (
     <StyledTypography
       as={Component}
-      variant={variant}
-      color={color}
-      align={align}
-      gutterBottom={gutterBottom}
-      noWrap={noWrap}
+      $variant={variant}
+      $color={color}
+      $align={align}
+      $gutterBottom={gutterBottom}
+      $noWrap={noWrap}
       className={className}
     >
       {children}

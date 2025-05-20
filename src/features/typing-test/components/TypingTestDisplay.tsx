@@ -34,25 +34,26 @@ const TextDisplay = styled.div`
   user-select: none;
 `;
 
-const TextCharacter = styled.span<{ status: 'current' | 'correct' | 'incorrect' | 'upcoming' }>`
+const TextCharacter = styled.span<{ $status: 'current' | 'correct' | 'incorrect' | 'upcoming' }>`
   position: relative;
   transition: all 0.05s ease;
   
-  ${props => props.status === 'current' && `
+  
+  ${props => props.$status === 'current' && `
     color: var(--text-primary);
     background-color: transparent;
   `}
   
-  ${props => props.status === 'correct' && `
+  ${props => props.$status === 'correct' && `
     color: var(--text-primary);
   `}
   
-  ${props => props.status === 'incorrect' && `
+  ${props => props.$status === 'incorrect' && `
     color: var(--error);
     text-decoration: underline;
   `}
   
-  ${props => props.status === 'upcoming' && `
+  ${props => props.$status === 'upcoming' && `
     color: var(--text-secondary);
   `}
 `;
@@ -159,7 +160,7 @@ export const TypingTestDisplay: React.FC<TypingTestDisplayProps> = ({ config, te
       else if (isIncorrect) status = 'incorrect';
       
       return (
-        <TextCharacter key={index} status={status}>
+        <TextCharacter key={index} $status={status}>
           {isCurrent && <Caret ref={caretRef} />}
           {char}
         </TextCharacter>

@@ -13,9 +13,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const StyledButton = styled.button<{
-  variant: ButtonVariant;
-  size: ButtonSize;
-  fullWidth: boolean;
+  $variant: ButtonVariant;
+  $size: ButtonSize;
+  $fullWidth: boolean;
 }>`
   display: inline-flex;
   align-items: center;
@@ -31,12 +31,12 @@ const StyledButton = styled.button<{
   position: relative;
   overflow: hidden;
   
-  ${props => props.fullWidth && css`
+  ${props => props.$fullWidth && css`
     width: 100%;
   `}
   
   ${props => {
-    switch (props.size) {
+    switch (props.$size) {
       case 'sm':
         return css`
           font-size: 0.875rem;
@@ -59,7 +59,7 @@ const StyledButton = styled.button<{
   }}
   
   ${props => {
-    switch (props.variant) {
+    switch (props.$variant) {
       case 'secondary':
         return css`
           background-color: var(--foreground);
@@ -145,9 +145,9 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   return (
     <StyledButton
-      variant={variant}
-      size={size}
-      fullWidth={fullWidth}
+      $variant={variant}
+      $size={size}
+      $fullWidth={fullWidth}
       disabled={disabled || loading}
       {...rest}
     >
@@ -165,4 +165,3 @@ export const Button: React.FC<ButtonProps> = ({
     </StyledButton>
   );
 };
-// Usage example
