@@ -1,17 +1,8 @@
 // src/services/huggingface.ts
 import { InferenceClient } from '@huggingface/inference';
 
-// Create client with correct token initialization
+// Create client with proper configuration
 const inferenceClient = new InferenceClient(import.meta.env.VITE_HF_ACCESS_TOKEN || '');
-
-// Store successful generations to avoid repetition
-const recentTexts = {
-  text: new Set<string>(),
-  code: new Map<string, Set<string>>()
-};
-
-// Maximum items to remember per category
-const MAX_RECENT = 5;
 
 interface GenerateTextParams {
   type: 'text' | 'code';
@@ -35,55 +26,34 @@ export const generatePracticeText = async ({
   const randomTopic = topics[Math.floor(Math.random() * topics.length)];
   
   try {
+    // Create appropriate prompt based on type
     const prompt = type === 'text' 
-      ? `Generate a ${difficulty} difficulty paragraph (40-60 words) about ${randomTopic} for a typing test. Focus on proper punctuation and varied vocabulary. The content should be educational and interesting.`
-      : `Generate a ${difficulty} difficulty ${language} code snippet (15-25 lines) that demonstrates ${randomTopic} concepts. Include helpful comments and use proper syntax. Make it realistic code that might be found in a production environment.`;
+      ? `Generate a ${difficulty} difficulty paragraph (40-60 words) about ${randomTopic} for a typing test. Focus on proper punctuation and varied vocabulary.`
+      : `Generate a ${difficulty} difficulty ${language} code snippet (15-25 lines) that demonstrates ${randomTopic} concepts. Include comments and use proper syntax.`;
 
-    // Use more reliable models with better outputs
-    const model = type === 'code' 
-      ? 'bigcode/starcoder' // More reliable than Qwen for code
-      : 'google/gemma-2-9b-it'; // Reliable general model with good inference API support
-      
-    console.log(`Attempting to generate ${type} with model: ${model}`);
+    console.log(`Attempting to generate ${type} content about ${randomTopic}...`);
 
-    const response = await inferenceClient.textGeneration({
-      model,
-      inputs: prompt,
-      parameters: {
-        max_new_tokens: 250,
-        temperature: 0.8, // Slightly higher temperature for more diversity
-        top_p: 0.92,
-        do_sample: true,
-        return_full_text: false,
-        repetition_penalty: 1.2
-      }
+    // Use chat-based model interaction since that's what novita supports
+    const response = await inferenceClient.chatCompletion({
+      model: "meta-llama/Meta-Llama-3.1-8B-Instruct", // Better supported model
+      messages: [
+        { role: "system", content: "You are a helpful assistant providing text for typing practice." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 250
     });
 
-    const generatedText = response.generated_text.trim();
-    
-    // If successful, add to recent texts to avoid repetition
+    // Extract the response content safely
+    const generatedText = response.choices &&
+      response.choices[0] &&
+      response.choices[0].message &&
+      typeof response.choices[0].message.content === 'string'
+      ? response.choices[0].message.content.trim()
+      : '';
+
     if (generatedText && generatedText.length > 20) {
-      if (type === 'text') {
-        recentTexts.text.add(generatedText);
-        if (recentTexts.text.size > MAX_RECENT) {
-          const oldest = recentTexts.text.values().next().value;
-          if (oldest !== undefined) {
-            recentTexts.text.delete(oldest);
-          }
-        }
-      } else {
-        if (!recentTexts.code.has(language)) {
-          recentTexts.code.set(language, new Set());
-        }
-        recentTexts.code.get(language)!.add(generatedText);
-        const langTexts = recentTexts.code.get(language)!;
-        if (langTexts.size > MAX_RECENT) {
-          const oldest = langTexts.values().next().value;
-          if (oldest !== undefined) {
-            langTexts.delete(oldest);
-          }
-        }
-      }
+      console.log("Successfully generated new content");
       return generatedText;
     }
     
@@ -91,146 +61,118 @@ export const generatePracticeText = async ({
   } catch (error) {
     console.error('Hugging Face API Error:', error);
     
-    // Enhanced fallback content with randomization
-    if (type === 'code') {
-      return getRandomCodeFallback(language);
-    } else {
-      return getRandomTextFallback();
+    // Try alternative models if first attempt fails
+    try {
+      console.log("Attempting fallback with different model...");
+      
+      // Try using the official Hugging Face Inference API directly
+      const fallbackResponse = await fetch(
+        "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_HF_ACCESS_TOKEN}`
+          },
+          body: JSON.stringify({
+            inputs: type === 'text'
+              ? `Write a paragraph about ${randomTopic} for a typing test.`
+              : `Write a ${language} code snippet about ${randomTopic} with comments.`,
+            parameters: {
+              max_new_tokens: 200,
+              temperature: 0.8,
+              return_full_text: false
+            }
+          })
+        }
+      );
+      
+      const fallbackData = await fallbackResponse.json();
+      if (fallbackData && fallbackData.generated_text) {
+        console.log("Successfully generated content with fallback model");
+        return fallbackData.generated_text;
+      }
+    } catch (fallbackError) {
+      console.error("Fallback model also failed:", fallbackError);
     }
+    
+    // Return appropriate fallback content if all else fails
+    return getRandomFallbackContent(type, language);
   }
 };
 
-// Multiple text fallbacks for variety
-function getRandomTextFallback(): string {
-  const fallbacks = [
-    "Programming is the process of creating instructions that tell a computer how to perform tasks. It combines logic, algorithms, and problem-solving to build software applications. Learning to program requires understanding syntax, data structures, and computational thinking.",
-    
-    "Version control systems like Git enable developers to track changes, collaborate efficiently, and maintain code history. Repositories store project files, while branches allow parallel development without affecting the main codebase. Pull requests facilitate code review before merging changes.",
-    
-    "Cloud computing provides on-demand access to computing resources over the internet. Services include storage, databases, networking, and software. This model offers scalability, reduced infrastructure costs, and flexibility for businesses of all sizes.",
-    
-    "Cybersecurity protects systems and networks from digital attacks. Common threats include malware, phishing, and ransomware. Defense strategies involve encryption, authentication, and regular security updates to safeguard sensitive information.",
-    
-    "APIs (Application Programming Interfaces) enable different software systems to communicate. RESTful APIs use HTTP requests to access and manipulate data, while GraphQL provides a more flexible query language. Well-designed APIs accelerate development and improve integration."
-  ];
+// Get random fallback content to ensure variety even when API fails
+function getRandomFallbackContent(type: 'text' | 'code', language?: string): string {
+  if (type === 'code') {
+    const codeFallbacks = [
+      `// ${language} function to calculate factorial
+function factorial(n) {
+  // Base case: factorial of 0 or 1 is 1
+  if (n <= 1) return 1;
   
-  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  // Recursive case: n! = n * (n-1)!
+  return n * factorial(n - 1);
 }
 
-// Multiple code fallbacks for variety
-function getRandomCodeFallback(language: string): string {
-  if (language === 'javascript' || language === 'typescript') {
-    const fallbacks = [
-      `// Calculate average of numbers in an array
-function calculateAverage(numbers) {
-  // Check if array is empty
-  if (numbers.length === 0) return 0;
-  
-  // Sum all numbers in the array
-  const sum = numbers.reduce((total, num) => total + num, 0);
-  
-  // Return the average
-  return sum / numbers.length;
-}`,
+// Example usage
+console.log(factorial(5)); // 120`,
 
-      `// Simple debounce function implementation
-function debounce(func, wait) {
-  // Store timeout reference
-  let timeout;
+      `// ${language} function to check if a string is a palindrome
+function isPalindrome(str) {
+  // Remove non-alphanumeric characters and convert to lowercase
+  const cleanStr = str.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
   
-  // Return wrapped function
-  return function executedFunction(...args) {
-    // Store this context
-    const context = this;
-    
-    // Clear previous timeout
-    clearTimeout(timeout);
-    
-    // Set new timeout
-    timeout = setTimeout(() => {
-      func.apply(context, args);
-    }, wait);
-  };
-}`,
+  // Compare with reversed version
+  const reversedStr = cleanStr.split('').reverse().join('');
+  
+  return cleanStr === reversedStr;
+}
 
-      `// Fetch data with async/await pattern
-async function fetchUserData(userId) {
-  try {
-    // Request user information
-    const response = await fetch(\`https://api.example.com/users/\${userId}\`);
+// Test cases
+console.log(isPalindrome("radar")); // true
+console.log(isPalindrome("A man, a plan, a canal: Panama")); // true
+console.log(isPalindrome("hello")); // false`,
+
+      `// ${language} implementation of bubble sort
+function bubbleSort(arr) {
+  const n = arr.length;
+  
+  // Outer loop for passes
+  for (let i = 0; i < n; i++) {
+    let swapped = false;
     
-    // Check if request was successful
-    if (!response.ok) {
-      throw new Error(\`HTTP error: \${response.status}\`);
+    // Inner loop for comparisons
+    for (let j = 0; j < n - i - 1; j++) {
+      // Compare adjacent elements
+      if (arr[j] > arr[j + 1]) {
+        // Swap elements
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        swapped = true;
+      }
     }
     
-    // Parse response as JSON
-    const userData = await response.json();
-    return userData;
-  } catch (error) {
-    console.error('Fetching user data failed:', error);
-    throw error;
+    // If no swapping occurred in this pass, array is sorted
+    if (!swapped) break;
   }
+  
+  return arr;
 }`
     ];
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
-  } 
-  else if (language === 'python') {
-    return `# Function to find prime numbers up to n
-def sieve_of_eratosthenes(n):
-    """
-    Find all prime numbers up to n using Sieve of Eratosthenes
-    """
-    # Initialize sieve array with True values
-    sieve = [True for _ in range(n+1)]
-    p = 2
     
-    # Mark multiples of each prime as non-prime
-    while p * p <= n:
-        if sieve[p]:
-            # Update all multiples of p
-            for i in range(p * p, n+1, p):
-                sieve[i] = False
-        p += 1
+    return codeFallbacks[Math.floor(Math.random() * codeFallbacks.length)];
+  } else {
+    const textFallbacks = [
+      "Artificial intelligence systems continue to transform industries with intelligent automation and predictive capabilities. Modern AI leverages neural networks to recognize patterns in vast datasets, enabling applications from natural language processing to computer vision. Ethical considerations around bias and transparency remain critical challenges.",
+      
+      "Cloud computing provides scalable resources for businesses without substantial hardware investments. Services range from infrastructure to platforms and software, all accessed remotely. This technology enables global collaboration, improved disaster recovery, and reduced operational costs while maintaining security through encryption and access controls.",
+      
+      "Cybersecurity protocols protect sensitive information from unauthorized access and evolving digital threats. Essential strategies include data encryption, multi-factor authentication, and regular security assessments. Organizations must stay vigilant against phishing attempts, ransomware, and zero-day vulnerabilities through continuous training and system updates.",
+      
+      "Version control systems enable developers to track code changes efficiently while facilitating team collaboration. By maintaining comprehensive history, these tools allow easy rollback to previous states when needed. Modern systems like Git provide branching capabilities that support simultaneous feature development without disrupting the main codebase.",
+      
+      "Database optimization techniques improve application performance through strategic indexing and query refinement. Normalized schemas reduce redundancy while maintaining data integrity across related tables. For high-traffic systems, caching mechanisms and connection pooling significantly reduce response times and resource consumption."
+    ];
     
-    # Collect prime numbers from sieve
-    primes = [p for p in range(2, n+1) if sieve[p]]
-    return primes
-
-# Example usage
-print(sieve_of_eratosthenes(50))`;
-  } 
-  else {
-    // Generic fallback for other languages
-    return `// Example ${language} function
-// This is a placeholder since API request failed
-// Function calculates sum and average of array elements
-
-function processData(data) {
-  // Initialize variables
-  let sum = 0;
-  let max = data.length > 0 ? data[0] : 0;
-  
-  // Process each data point
-  for (let i = 0; i < data.length; i++) {
-    // Add to running sum
-    sum += data[i];
-    
-    // Track maximum value
-    if (data[i] > max) {
-      max = data[i];
-    }
-  }
-  
-  // Calculate average
-  const average = data.length > 0 ? sum / data.length : 0;
-  
-  // Return computed values
-  return {
-    sum: sum,
-    average: average,
-    maximum: max
-  };
-}`;
+    return textFallbacks[Math.floor(Math.random() * textFallbacks.length)];
   }
 }
