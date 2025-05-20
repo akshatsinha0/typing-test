@@ -8,6 +8,7 @@ interface GenerateTextParams {
   type: 'text' | 'code';
   language?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
+  signal?: AbortSignal;
 }
 
 export const generatePracticeText = async ({

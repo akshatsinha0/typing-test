@@ -5,14 +5,25 @@ export const generateInfiniteText = async (
   language: string,
   complexity: 'easy' | 'medium' | 'hard',
   signal?: AbortSignal
-) => {
+): Promise<string> => {
   try {
+    // Check if already aborted before starting
+    if (signal?.aborted) {
+      throw new DOMException("Operation aborted by the user", "AbortError");
+    }
+
     // Generate initial text (this will use fallback if API fails)
+    // Don't pass signal directly since the interface doesn't support it
     const initialText = await generatePracticeText({
       type: 'text',
       language,
       difficulty: complexity
     });
+    
+    // Check if aborted during text generation
+    if (signal?.aborted) {
+      throw new DOMException("Operation aborted by the user", "AbortError");
+    }
     
     // Check if we're getting a fallback text (API limit reached)
     if (initialText.includes("Artificial intelligence systems") || 
@@ -34,6 +45,11 @@ export const generateInfiniteText = async (
         "Quantum computing leverages quantum mechanics principles to process information in fundamentally new ways. Unlike classical bits, quantum bits or qubits can exist in multiple states simultaneously through superposition. This property potentially enables exponential speedups for certain computational problems that are intractable with classical computers."
       ];
       
+      // Check if aborted before combining texts
+      if (signal?.aborted) {
+        throw new DOMException("Operation aborted by the user", "AbortError");
+      }
+      
       // Randomly select 2-3 additional texts for variety
       const shuffled = [...additionalTexts].sort(() => 0.5 - Math.random());
       const selected = shuffled.slice(0, 2 + Math.floor(Math.random() * 2));
@@ -44,6 +60,11 @@ export const generateInfiniteText = async (
     
     return initialText;
   } catch (error) {
+    // Propagate abort errors instead of handling them
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error;
+    }
+    
     console.error("Error in generateInfiniteText:", error);
     
     // Provide a robust fallback if any errors occur
